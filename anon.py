@@ -42,12 +42,12 @@ class SASLInitiatingInitializer(sasl.SASLInitiatingInitializer):
                 self.mechanism = sasl_mechanisms.Plain(None, jid.user, 
                                                        password)
             else:
-                raise sasl.SASLNoAcceptableMechanisms()
+                raise sasl.SASLNoAcceptableMechanism()
         else:
             if 'ANONYMOUS' in mechanisms:
                 self.mechanism = Anonymous()
             else:
-                raise sasl.SASLNoAccetableMechanisms()
+                raise sasl.SASLNoAccetableMechanism()
 
 
 class XMPPAuthenticator(jclient.XMPPAuthenticator):
