@@ -16,7 +16,7 @@ import random, binascii, base64, md5, sha, time, os, random
 import os, sys
 import time
 
-from punjab.httpb import HttpbParse # maybe use something else to seperate from punjab
+from wokkel.generic import parseXml
 
 TLS_XMLNS = 'urn:ietf:params:xml:ns:xmpp-tls'
 SASL_XMLNS = 'urn:ietf:params:xml:ns:xmpp-sasl'
@@ -141,12 +141,13 @@ class QueryFactory(protocol.ClientFactory):
     noisy = False
     protocol = QueryProtocol
     cookie = None
+
     def __init__(self, url, host, b):
         self.url, self.host = url, host
         self.deferred = defer.Deferred()
         self.cb = b
 
-    def send(self,b):
+    def send(self, b):
         self.deferred = defer.Deferred()
         self.client.sendBody(b, cookie=self.cookie)
         
@@ -155,9 +156,10 @@ class QueryFactory(protocol.ClientFactory):
     def parseResponse(self, contents, protocol):
         self.client = protocol
 
-        hp = HttpbParse(True)
         try:
-            body_tag,elements = hp.parse(contents)
+            element = parseXml(contents)
+            body_tag = element
+            elements = element.children
         except Exception, ex:
             log.err(str(ex))
             raise
@@ -166,8 +168,6 @@ class QueryFactory(protocol.ClientFactory):
                 return defer.fail((body_tag))
 
             if body_tag.hasAttribute('type') and body_tag['type'] == 'terminate':
-                print body_tag.toXml()
-                
                 if self.deferred.called:
                     return defer.fail((body_tag,elements))
                 else:            
@@ -202,7 +202,7 @@ class QueryFactory(protocol.ClientFactory):
 import random, sha, md5
 
 class Keys:
-    """ A class to generate keys for http binding """
+    """ A class to generate keys for BOSH """
     def __init__(self):
         self.set_keys()
         
@@ -287,7 +287,11 @@ class Proxy:
 
 class HTTPBClientConnector:
     """
-    A HTTP Binding client connector. 
+    BOSH client connector. 
+
+    @ivar url: The BOSH endpoint
+    @type url: C{str}
+
     """
     def __init__(self, url):
         self.url = url
@@ -307,7 +311,7 @@ class HTTPBClientConnector:
         
 class HTTPBindingStream(xmlstream.XmlStream):
     """
-    HTTP Binding wrapper that acts like xmlstream
+    BOSH wrapper that acts like L{xmlstream.XmlStream}
 
     """
 
@@ -368,8 +372,6 @@ class HTTPBindingStream(xmlstream.XmlStream):
             raise ex
         
         if stream_started:
-
-            #self.authenticator.initializeStream()
         
             r['version'] = r['ver']
             self.authenticator.streamStarted(r)
@@ -400,14 +402,13 @@ class HTTPBindingStream(xmlstream.XmlStream):
 
         self.stream_reset = True
             
-        
 
     def _initializeStream(self):
         """ Initialize binding session.
         
         Just need to create a session once, this can be done elsewhere, but here will do for now.
         """
-        b = domish.Element((NS_HTTP_BIND,'body'))
+        b = domish.Element((NS_HTTP_BIND, 'body'))
         
         b['content']  = 'text/xml; charset=utf-8'
         
@@ -516,10 +517,8 @@ class HTTPBindingStream(xmlstream.XmlStream):
         #b = self.key(b)
         
         self.requests.append(b)
-        d = self.proxy.send(b, self.cookie)
-        
+        d = self.proxy.send(b, self.cookie)        
         d.addCallback(self._cbSend, b['rid'])
-
         return d
 
 
